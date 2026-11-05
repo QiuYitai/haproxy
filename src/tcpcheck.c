@@ -577,7 +577,13 @@ static enum tcpcheck_eval_ret tcpcheck_mysql_expect_packet(struct check *check, 
 		(((unsigned char) *(b_peek(&check->bi, offset+1))) << 8) +
 		(((unsigned char) *(b_peek(&check->bi, offset+2))) << 16);
 
-	if (b_data(&check->bi) < offset+plen+4) {
+	/* The shortest packet inspected below carries 4 payload bytes:
+	 * field_count, a 2-byte error code and a byte before the message
+	 * body. With a smaller length, the reads at offset+4..offset+7
+	 * below would go past the received data, and offset+7 could even be
+	 * above b_data(), making the length computation below wrap around.
+	 */
+	if (plen < 4 || b_data(&check->bi) < offset+plen+4) {
 		if (!last_read)
 			goto wait_more_data;
 
